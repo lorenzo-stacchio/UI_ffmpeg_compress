@@ -5,6 +5,7 @@ import threading
 import subprocess
 import shlex
 from pathlib import Path
+from tkinter import Tk, filedialog
 
 if getattr(sys, 'frozen', False) and not site.USER_BASE:
     # Kivy's Windows dependency packages assume USER_BASE is a string.
@@ -15,10 +16,6 @@ from kivy.clock import Clock
 from kivy.lang import Builder
 from kivy.properties import StringProperty, BooleanProperty
 from kivy.uix.boxlayout import BoxLayout
-from kivy.uix.popup import Popup
-from kivy.uix.filechooser import FileChooserListView
-from kivy.uix.label import Label
-from kivy.uix.button import Button
 
 KV = '''
 <RootWidget>:
@@ -179,39 +176,6 @@ KV = '''
 '''
 
 
-class FileChooserPopup(Popup):
-    def __init__(self, on_select, **kwargs):
-        super().__init__(**kwargs)
-        self.title = 'Select a video file'
-        self.size_hint = (0.9, 0.9)
-        self.auto_dismiss = False
-        self.on_select = on_select
-
-        layout = BoxLayout(orientation='vertical', spacing=8, padding=8)
-        chooser = FileChooserListView(
-            path=str(Path.home()),
-            filters=['*.mp4', '*.mov', '*.mkv', '*.avi', '*.webm', '*.m4v', '*.flv']
-        )
-        layout.add_widget(chooser)
-
-        button_row = BoxLayout(size_hint_y=None, height='44dp', spacing=8)
-        cancel_btn = Button(text='Cancel')
-        select_btn = Button(text='Select')
-
-        cancel_btn.bind(on_release=lambda *_: self.dismiss())
-        select_btn.bind(on_release=lambda *_: self._select(chooser.selection))
-
-        button_row.add_widget(cancel_btn)
-        button_row.add_widget(select_btn)
-        layout.add_widget(button_row)
-        self.content = layout
-
-    def _select(self, selection):
-        if selection:
-            self.on_select(selection[0])
-            self.dismiss()
-
-
 class RootWidget(BoxLayout):
     input_path = StringProperty('')
     output_path = StringProperty('')
@@ -232,8 +196,14 @@ class RootWidget(BoxLayout):
         self.worker_thread = None
 
     def open_file_dialog(self):
-        popup = FileChooserPopup(on_select=self.set_input_file)
-        popup.open()
+        try:
+            file_path = open_system_file_dialog(self.input_path)
+        except Exception as e:
+            self.status_text = f'File dialog error: {e}'
+            return
+
+        if file_path:
+            self.set_input_file(file_path)
 
     def set_input_file(self, file_path):
         self.input_path = file_path
@@ -348,6 +318,27 @@ class RootWidget(BoxLayout):
 def shutil_which(cmd_name):
     from shutil import which
     return which(cmd_name)
+
+
+def open_system_file_dialog(current_path=''):
+    initial_dir = str(Path(current_path).expanduser().resolve().parent) if current_path else str(Path.home())
+
+    root = Tk()
+    root.withdraw()
+    root.attributes('-topmost', True)
+    root.update()
+
+    try:
+        return filedialog.askopenfilename(
+            title='Select a video file',
+            initialdir=initial_dir,
+            filetypes=[
+                ('Video files', '*.mp4 *.mov *.mkv *.avi *.webm *.m4v *.flv'),
+                ('All files', '*.*'),
+            ],
+        )
+    finally:
+        root.destroy()
 
 
 def get_app_directory():
