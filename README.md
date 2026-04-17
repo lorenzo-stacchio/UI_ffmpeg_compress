@@ -254,3 +254,73 @@ Possible extensions for this project:
 * progress bar with parsed ffmpeg progress
 * export presets for lecture, webcam, and archival profiles
 * Windows `.exe` packaging with PyInstaller
+
+---
+
+## Build a Windows `.exe`
+
+This project now includes a PowerShell build script for **PyInstaller**:
+
+```powershell
+.\build_exe.ps1
+```
+
+This creates a Windows desktop build in:
+
+```text
+dist\FFmpegVideoCompressor\
+```
+
+### Recommended build type
+
+The default build is **`--onedir`**, which is usually more reliable for Kivy apps and tends to trigger fewer false positives than a single-file bundle.
+
+If you explicitly want a single `.exe`, run:
+
+```powershell
+.\build_exe.ps1 -OneFile
+```
+
+### Bundle `ffmpeg.exe` with the app
+
+If you want the exported app to work without requiring `ffmpeg` in `PATH`, pass the path to `ffmpeg.exe` during build:
+
+```powershell
+.\build_exe.ps1 -FfmpegPath C:\ffmpeg\bin\ffmpeg.exe
+```
+
+The app will also look for `ffmpeg.exe` next to the exported program, so you can copy it into the output folder later if you prefer.
+
+### Build dependencies
+
+The build script creates a local virtual environment in:
+
+```text
+.venv-build
+```
+
+and installs:
+
+* `kivy`
+* `pyinstaller`
+
+from:
+
+```text
+requirements-build.txt
+```
+
+---
+
+## About Windows security warnings
+
+This project does **not** include any technique to bypass Windows security checks, antivirus, or SmartScreen.
+
+If you want to reduce warnings in a legitimate way:
+
+* use the default `--onedir` build instead of `--onefile`
+* distribute the app internally only
+* sign the final executable with your organization code-signing certificate
+* avoid packing/obfuscation tools that look suspicious to antivirus products
+
+For internal use, code signing is the correct approach if you want Windows to trust the executable more consistently.

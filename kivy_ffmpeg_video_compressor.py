@@ -1,9 +1,15 @@
 import os
 import sys
+import site
 import threading
 import subprocess
 import shlex
 from pathlib import Path
+
+if getattr(sys, 'frozen', False) and not site.USER_BASE:
+    # Kivy's Windows dependency packages assume USER_BASE is a string.
+    site.USER_BASE = sys.prefix
+
 from kivy.app import App
 from kivy.clock import Clock
 from kivy.lang import Builder
@@ -247,7 +253,13 @@ class RootWidget(BoxLayout):
         if not self.output_path:
             raise ValueError('Please specify an output file.')
 
-        cmd = ['ffmpeg']
+        ffmpeg_path = find_ffmpeg_executable()
+        if ffmpeg_path is None:
+            raise ValueError(
+                'ffmpeg not found. Put ffmpeg.exe next to the app or install ffmpeg in PATH.'
+            )
+
+        cmd = [ffmpeg_path]
         cmd.append('-y' if self.overwrite_output else '-n')
         cmd.extend(['-i', self.input_path])
 
@@ -278,15 +290,6 @@ class RootWidget(BoxLayout):
             cmd = self.build_ffmpeg_command()
         except Exception as e:
             self.status_text = f'Error: {e}'
-            return
-
-        if shutil_which('ffmpeg') is None:
-            self.status_text = 'Error: ffmpeg not found in PATH.'
-            self.log_text = (
-                'Install ffmpeg and make sure it is available from the command line.\n'
-                'Windows: add ffmpeg/bin to PATH.\n'
-                'Linux/macOS: install ffmpeg from your package manager.'
-            )
             return
 
         self.is_running = True
@@ -345,6 +348,35 @@ class RootWidget(BoxLayout):
 def shutil_which(cmd_name):
     from shutil import which
     return which(cmd_name)
+
+
+def get_app_directory():
+    if getattr(sys, 'frozen', False):
+        return Path(sys.executable).resolve().parent
+    return Path(__file__).resolve().parent
+
+
+def find_ffmpeg_executable():
+    app_dir = get_app_directory()
+    candidates = []
+
+    if sys.platform.startswith('win'):
+        candidates.extend([
+            app_dir / 'ffmpeg.exe',
+            app_dir / 'ffmpeg' / 'ffmpeg.exe',
+            app_dir / 'ffmpeg' / 'bin' / 'ffmpeg.exe',
+        ])
+    else:
+        candidates.extend([
+            app_dir / 'ffmpeg',
+            app_dir / 'ffmpeg' / 'bin' / 'ffmpeg',
+        ])
+
+    for candidate in candidates:
+        if candidate.exists():
+            return str(candidate)
+
+    return shutil_which('ffmpeg')
 
 
 class VideoCompressorApp(App):
